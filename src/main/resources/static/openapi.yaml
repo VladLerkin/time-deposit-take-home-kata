@@ -1,0 +1,73 @@
+openapi: 3.0.3
+info:
+  title: XA Bank Time Deposit API
+  description: RESTful API for retrieving time deposits and updating monthly balances.
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /time-deposits:
+    get:
+      tags:
+        - TimeDeposits
+      operationId: getAllTimeDeposits
+      summary: Retrieve all time deposits
+      responses:
+        '200':
+          description: List of all time deposits with their withdrawals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimeDeposit'
+  /time-deposits/balance-updates:
+    post:
+      tags:
+        - TimeDeposits
+      operationId: updateAllBalances
+      summary: Update balances of all time deposits in the database
+      responses:
+        '204':
+          description: All time deposit balances updated
+components:
+  schemas:
+    TimeDeposit:
+      type: object
+      required:
+        - id
+        - planType
+        - balance
+        - days
+        - withdrawals
+      properties:
+        id:
+          type: integer
+          format: int32
+        planType:
+          type: string
+        balance:
+          type: number
+          format: double
+        days:
+          type: integer
+          format: int32
+        withdrawals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Withdrawal'
+    Withdrawal:
+      type: object
+      required:
+        - id
+        - amount
+        - date
+      properties:
+        id:
+          type: integer
+          format: int32
+        amount:
+          type: number
+        date:
+          type: string
+          format: date
