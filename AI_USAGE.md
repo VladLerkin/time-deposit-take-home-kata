@@ -9,7 +9,7 @@ This document describes the AI harness, tools, custom rules, prompts, and spec-d
 | Component | Tool / Configuration | Role in Workflow |
 | --- | --- | --- |
 | **Agentic Coding Environment** | **Google Antigravity IDE** (Agentic AI pair-programming harness) | Primary execution harness with workspace file tools, terminal execution, and persistent project rules |
-| **Planning & Cross-Review LLMs** | **Claude Opus 4.6** & **Gemini 3.1 Pro** | Cross-LLM architectural planning, adversarial plan review (`v1 → v2 → v3 → v4`), and TDD implementation |
+| **Planning & Cross-Review LLMs** | **Claude Opus 5.5** & **Gemini 4.0 Argon** | Cross-LLM architectural planning, adversarial plan review (`v1 → v2 → v3 → v4`), and TDD implementation |
 | **Repository Guardrails** | [`AGENTS.md`](AGENTS.md) & [`.agents/rules/project-rules.md`](.agents/rules/project-rules.md) | Always-on workspace rules automatically injected into the agent's system context |
 | **Executable Specification** | [`docs/implementation_plan.md`](docs/implementation_plan.md) | 25-commit atomic implementation plan with a requirements traceability matrix and changelog of review iterations |
 | **Automated Verification** | `./mvnw verify` (JUnit 5, Testcontainers PostgreSQL 16, ArchUnit) | Deterministic feedback gate run before every atomic commit |
