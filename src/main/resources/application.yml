@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: time-deposit-service
+  jpa:
+    open-in-view: false
