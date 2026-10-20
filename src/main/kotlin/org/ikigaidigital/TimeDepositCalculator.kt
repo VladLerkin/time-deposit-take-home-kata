@@ -20,8 +20,10 @@ class TimeDepositCalculator {
                     interest += xs[i].balance * 0.01 / 12
                 }
             }
-            val a2d = BigDecimal(interest).setScale(2, RoundingMode.HALF_UP)
-            xs[i].balance += a2d.toDouble()
+            xs[i].balance += roundInterest(interest)
         }
     }
+
+    private fun roundInterest(interest: Double): Double =
+        BigDecimal(interest).setScale(2, RoundingMode.HALF_UP).toDouble()
 }
