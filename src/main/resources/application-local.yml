@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/timedeposit}
+    username: ${DB_USER:timedeposit}
+    password: ${DB_PASSWORD:timedeposit}
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/seed
