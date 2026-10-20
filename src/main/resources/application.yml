@@ -5,3 +5,11 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+
+# Assumption: Swagger UI and static /openapi.yaml are documentation assets (not business API endpoints).
+# springdoc.api-docs remains enabled because springdoc-openapi-starter-webmvc-ui 2.8.x requires it
+# to register the Swagger UI resource handlers (/swagger-ui/index.html and /v3/api-docs/swagger-config),
+# while springdoc.swagger-ui.url=/openapi.yaml instructs Swagger UI to load the static contract directly.
+springdoc:
+  swagger-ui:
+    url: /openapi.yaml
