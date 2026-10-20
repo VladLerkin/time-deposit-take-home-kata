@@ -2,9 +2,11 @@ package org.ikigaidigital.adapter.rest
 
 import org.ikigaidigital.TimeDeposit
 import org.ikigaidigital.application.GetAllTimeDepositsUseCase
+import org.ikigaidigital.application.UpdateAllBalancesUseCase
 import org.ikigaidigital.domain.TimeDepositView
 import org.ikigaidigital.domain.Withdrawal
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -12,6 +14,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -26,6 +29,9 @@ class TimeDepositControllerTest {
 
     @MockitoBean
     private lateinit var getAllTimeDepositsUseCase: GetAllTimeDepositsUseCase
+
+    @MockitoBean
+    private lateinit var updateAllBalancesUseCase: UpdateAllBalancesUseCase
 
     @Test
     fun `GET time-deposits should return 200 OK with time deposits and nested withdrawals`() {
@@ -67,5 +73,14 @@ class TimeDepositControllerTest {
             .andExpect(jsonPath("$[1].balance").value(6000.0))
             .andExpect(jsonPath("$[1].days").value(60))
             .andExpect(jsonPath("$[1].withdrawals").isEmpty)
+    }
+
+    @Test
+    fun `POST time-deposits balance-updates should execute use case and return 204 No Content`() {
+        mockMvc.perform(post("/time-deposits/balance-updates"))
+            .andExpect(status().isNoContent)
+            .andExpect(content().string(""))
+
+        verify(updateAllBalancesUseCase).execute()
     }
 }
