@@ -158,11 +158,11 @@ curl -i http://localhost:8080/time-deposits
 
 - **Hexagonal Architecture (Ports & Adapters)** enforced by `HexagonalArchitectureTest` (ArchUnit):
   - `org.ikigaidigital` & `org.ikigaidigital.domain`: Pure domain layer with zero framework dependencies. Preserves `TimeDeposit` and `TimeDepositCalculator` in the root `org.ikigaidigital` package with identical public signatures and IEEE 754 `Double` rounding semantics (`RoundingMode.HALF_UP` to 2 decimal places).
-  - `org.ikigaidigital.application`: Framework-free inbound use case ports (`GetAllTimeDepositsUseCase`, `UpdateAllBalancesUseCase`), outbound repository ports (`TimeDepositRepository`, `TimeDepositReadRepository`), and use case services.
+  - `org.ikigaidigital.application`: Framework-free inbound use case ports (`GetAllTimeDepositsUseCase`, `UpdateAllBalancesUseCase`), outbound ports (`TimeDepositRepository`, `TimeDepositReadRepository`, `BalanceUpdateLock`), and use case services.
   - `org.ikigaidigital.adapter.rest`: Contract-first REST controller implementing the `TimeDepositsApi` interface generated from `src/main/resources/static/openapi.yaml` via `openapi-generator-maven-plugin`.
-  - `org.ikigaidigital.adapter.persistence`: Spring Data JPA adapter using targeted `@Modifying` balance updates and a 2-query read strategy (`time_deposits` + `withdrawals WHERE time_deposit_id IN (...)`) to avoid N+1 queries and ensure withdrawals are never lost during balance updates.
+  - `org.ikigaidigital.adapter.persistence`: Spring Data JPA adapter using targeted `@Modifying` balance updates and a 2-query read strategy (all `time_deposits` + all `withdrawals`, grouped in memory) to avoid N+1 queries and ensure withdrawals are never lost during balance updates. `PostgresBalanceUpdateLock` serializes concurrent balance update runs with a transaction-scoped advisory lock (`pg_advisory_xact_lock`).
   - `org.ikigaidigital.config`: Spring `@Configuration` wiring and `TransactionalUpdateAllBalances` decorator keeping `@Transactional` out of the `application` layer.
-- **Extensible Interest Calculation**: Composable `EligibilityRule` (`afterDays`, `upToDays`, `and`) and `RateInterestPolicy` registered in `InterestPolicyRegistry` allow adding new plan types or tiered rules without modifying existing calculator logic (Open/Closed Principle).
+- **Extensible Interest Calculation**: Composable `EligibilityRule` implementations (`MinAgeRule`, `MaxAgeRule`) combined in `RuleBasedInterestPolicy` and registered in `InterestPolicyRegistry` allow adding new plan types or tiered rules without modifying existing calculator logic (Open/Closed Principle).
 
 ---
 
@@ -177,7 +177,20 @@ All assumptions are also documented in code/configuration comments:
 
 ---
 
-### 6. AI-Assisted Development Documentation
+### 6. Known Limitations & Next Steps
+
+These are deliberate scope decisions: the assignment fixes the database schema to exactly two tables and stores no dates on a time deposit, so an accrual period cannot be tracked without extending it.
+
+1. **Repeated `POST` accrues interest again.** Each call applies one monthly accrual and nothing records which period has already been paid, so a retried or duplicated request pays interest twice. Next step: an `interest_accruals` journal (`time_deposit_id`, `period`, `amount`) with a unique key on `(time_deposit_id, period)`, which makes the operation idempotent and gives an audit trail of every balance change.
+2. **`days` is static.** The deposit age does not advance between runs. Next step: store an opening date (`opened_on`) and derive `days` from it and an injected `Clock` in the persistence adapter, leaving `TimeDeposit` unchanged.
+3. **Withdrawals do not reduce the balance.** They are kept as historical records only (see assumption 3); whether they should reduce the balance needs to be confirmed with the business.
+4. **The whole table is processed in one transaction.** All deposits are loaded into memory and updated one statement at a time. Next step for large volumes: chunked processing with JDBC batch updates.
+
+Concurrent `POST` requests are already handled: runs are serialized by `PostgresBalanceUpdateLock`, so overlapping requests give the same result as sequential ones.
+
+---
+
+### 7. AI-Assisted Development Documentation
 
 - **[AI_USAGE.md](AI_USAGE.md)**: Detailed documentation of the AI harness, tools, iterative cross-LLM specification workflow (`v1 → v2 → v3 → v4`), and a breakdown of AI-assisted work.
 - **[AGENTS.md](AGENTS.md)** & **[.agents/rules/project-rules.md](.agents/rules/project-rules.md)**: Architectural guardrails and TDD rules used by the AI coding agent.
