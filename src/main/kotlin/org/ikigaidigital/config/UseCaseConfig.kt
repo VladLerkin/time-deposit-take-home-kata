@@ -1,6 +1,7 @@
 package org.ikigaidigital.config
 
 import org.ikigaidigital.TimeDepositCalculator
+import org.ikigaidigital.application.BalanceUpdateLock
 import org.ikigaidigital.application.GetAllTimeDepositsService
 import org.ikigaidigital.application.GetAllTimeDepositsUseCase
 import org.ikigaidigital.application.TimeDepositReadRepository
@@ -20,10 +21,11 @@ class UseCaseConfig {
     @Bean
     fun updateAllBalancesUseCase(
         repository: TimeDepositRepository,
+        lock: BalanceUpdateLock,
         calculator: TimeDepositCalculator,
         transactionOperations: TransactionOperations
     ): UpdateAllBalancesUseCase = TransactionalUpdateAllBalances(
-        delegate = UpdateAllBalancesService(repository, calculator),
+        delegate = UpdateAllBalancesService(repository, lock, calculator),
         transactionOperations = transactionOperations
     )
 

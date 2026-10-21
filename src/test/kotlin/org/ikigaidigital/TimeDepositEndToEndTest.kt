@@ -1,5 +1,7 @@
 package org.ikigaidigital
 
+import org.assertj.core.api.Assertions.assertThat
+import org.ikigaidigital.application.UpdateAllBalancesUseCase
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +19,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -35,6 +42,9 @@ class TimeDepositEndToEndTest {
 
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var updateAllBalancesUseCase: UpdateAllBalancesUseCase
 
     @BeforeEach
     fun setUpFixtures() {
@@ -103,5 +113,43 @@ class TimeDepositEndToEndTest {
             .andExpect(jsonPath("$[3].days").value(30))
             .andExpect(jsonPath("$[3].balance").value(1000.0))
             .andExpect(jsonPath("$[3].withdrawals").isEmpty)
+    }
+
+    @Test
+    fun `concurrent balance updates should give the same result as sequential ones`() {
+        val runs = 8
+        val expected = listOf(
+            TimeDeposit(id = 1, planType = "basic", balance = 1200.00, days = 45),
+            TimeDeposit(id = 2, planType = "student", balance = 2400.00, days = 180),
+            TimeDeposit(id = 3, planType = "premium", balance = 6000.00, days = 60),
+            TimeDeposit(id = 4, planType = "basic", balance = 1000.00, days = 30)
+        )
+        // Sequential reference: each run is followed by rounding to NUMERIC(19, 2), as the persistence adapter does
+        repeat(runs) {
+            TimeDepositCalculator().updateBalance(expected)
+            expected.forEach { it.balance = BigDecimal.valueOf(it.balance).setScale(2, RoundingMode.HALF_UP).toDouble() }
+        }
+
+        val startGate = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(runs)
+        try {
+            val futures = (1..runs).map {
+                executor.submit {
+                    startGate.await()
+                    updateAllBalancesUseCase.execute()
+                }
+            }
+            startGate.countDown()
+            futures.forEach { it.get(30, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+
+        val actual = jdbcTemplate.query("SELECT id, balance FROM time_deposits ORDER BY id") { rs, _ ->
+            rs.getInt("id") to rs.getBigDecimal("balance")
+        }
+        assertThat(actual).containsExactlyElementsOf(
+            expected.map { it.id to BigDecimal.valueOf(it.balance).setScale(2, RoundingMode.HALF_UP) }
+        )
     }
 }

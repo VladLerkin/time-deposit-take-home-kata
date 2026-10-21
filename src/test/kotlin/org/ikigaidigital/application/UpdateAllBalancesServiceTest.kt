@@ -24,6 +24,7 @@ class UpdateAllBalancesServiceTest {
         val fakeStore = InMemoryFakeTimeDepositStore(initialDeposits, initialWithdrawals)
         val useCase: UpdateAllBalancesUseCase = UpdateAllBalancesService(
             repository = fakeStore,
+            lock = {},
             calculator = TimeDepositCalculator()
         )
 
@@ -36,6 +37,29 @@ class UpdateAllBalancesServiceTest {
             TimeDeposit(id = 3, planType = "premium", balance = 1200.00, days = 30)
         )
         assertThat(fakeStore.withdrawals()).containsExactlyElementsOf(initialWithdrawals)
+    }
+
+    @Test
+    fun `should acquire the balance update lock before reading deposits`() {
+        val events = mutableListOf<String>()
+        val repository = object : TimeDepositRepository {
+            override fun findAll(): List<TimeDeposit> {
+                events.add("findAll")
+                return emptyList()
+            }
+
+            override fun updateBalances(deposits: List<TimeDeposit>) {
+                events.add("updateBalances")
+            }
+        }
+        val useCase = UpdateAllBalancesService(
+            repository = repository,
+            lock = { events.add("lock") }
+        )
+
+        useCase.execute()
+
+        assertThat(events).containsExactly("lock", "findAll", "updateBalances")
     }
 
     private class InMemoryFakeTimeDepositStore(
