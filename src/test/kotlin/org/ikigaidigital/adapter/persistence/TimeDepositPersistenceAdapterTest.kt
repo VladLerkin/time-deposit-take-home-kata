@@ -1,6 +1,8 @@
 package org.ikigaidigital.adapter.persistence
 
+import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
+import org.hibernate.SessionFactory
 import org.ikigaidigital.TimeDeposit
 import org.ikigaidigital.domain.Withdrawal
 import org.junit.jupiter.api.BeforeEach
@@ -37,6 +39,9 @@ class TimeDepositPersistenceAdapterTest {
 
     @Autowired
     private lateinit var withdrawalJpaRepository: SpringDataWithdrawalRepository
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
 
     @BeforeEach
     fun setUp() {
@@ -76,6 +81,32 @@ class TimeDepositPersistenceAdapterTest {
         )
         assertThat(views[1].deposit).isEqualTo(TimeDeposit(id = 2, planType = "student", balance = 2406.00, days = 100))
         assertThat(views[1].withdrawals).isEmpty()
+    }
+
+    @Test
+    fun `findAllWithWithdrawals should use two queries regardless of deposit count (no N+1)`() {
+        depositJpaRepository.saveAll(
+            (1..5).map { id ->
+                TimeDepositEntity(id = id, planType = "basic", days = 60, balance = BigDecimal("1000.00"))
+            }
+        )
+        withdrawalJpaRepository.saveAll(
+            (1..5).map { id ->
+                WithdrawalEntity(id = id, timeDepositId = id, amount = BigDecimal("10.00"), date = LocalDate.of(2026, 1, id))
+            }
+        )
+        entityManager.flush()
+        entityManager.clear()
+
+        val statistics = entityManager.entityManagerFactory.unwrap(SessionFactory::class.java).statistics
+        statistics.isStatisticsEnabled = true
+        statistics.clear()
+
+        val views = adapter.findAllWithWithdrawals()
+
+        assertThat(views).hasSize(5)
+        assertThat(views).allSatisfy { assertThat(it.withdrawals).hasSize(1) }
+        assertThat(statistics.prepareStatementCount).isEqualTo(2)
     }
 
     @Test
